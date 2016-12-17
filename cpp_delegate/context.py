@@ -50,6 +50,32 @@ class Context(object):
 
 
 class RemoteContext(Context, DirMixIn):
+    '''
+    This class provides access to public variables and fields within a remote
+    context (i.e., namespace).
+
+    Variables and fields are accessible as Python attributes, allowing, for
+    example, tab completion in IPython.
+
+    Parameters
+    ----------
+    stream : serial.Serial
+        A serial connection to the remote device.
+    cpp_ast_json : dict
+        A JSON-serializable C++ abstract syntax tree, as parsed by
+        `clang_helpers.clang_ast.parse_cpp_ast(..., format='json')`.
+    namespace : str, optional
+        A namespace specifier (e.g., ``"foo::bar"``) indicating the namespace
+        to expose.
+
+        A value of ``""`` corresponds to the top-level namespace.
+
+    Attributes
+    ----------
+    .<remote variable/field>
+        An attribute corresponding to each public variable or field within the
+        remote context :attr:`namespace`.
+    '''
     def __init__(self, stream, cpp_ast_json, namespace=''):
         self.stream = stream
         super(RemoteContext, self).__init__(cpp_ast_json, namespace=namespace)

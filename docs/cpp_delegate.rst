@@ -22,6 +22,7 @@ cpp_delegate Package
 
 .. automodule:: cpp_delegate.context
     :members:
+    :private-members:
     :undoc-members:
     :show-inheritance:
 
