@@ -1,0 +1,20 @@
+name: cpp-delegate
+channels: !!python/tuple
+- !!python/unicode
+  'conda-forge'
+- !!python/unicode
+  'wheeler-microfluidics'
+- !!python/unicode
+  'defaults'
+dependencies:
+- clang-helpers
+- jinja2
+- nadamq
+- numpy
+- numpydoc
+- path_helpers
+- pydash
+- python
+- six
+- sphinx
+- sphinx_rtd_theme
