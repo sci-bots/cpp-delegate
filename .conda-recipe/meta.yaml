@@ -1,0 +1,40 @@
+# source will be downloaded prior to filling in jinja templates
+# Example assumes that this folder has setup.py in it
+source:
+  git_url: ../
+
+package:
+  name: cpp-delegate
+  version: {{ GIT_DESCRIBE_TAG[1:] }}
+
+build:
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  number: {{ GIT_DESCRIBE_NUMBER }}
+
+requirements:
+  build:
+    - clang-helpers
+    - future
+    - jinja2
+    - nadamq
+    - numpy
+    - path_helpers
+    - paver
+    - pydash
+    - python
+    - six
+
+  run:
+    - clang-helpers
+    - jinja2
+    - nadamq
+    - numpy
+    - path_helpers
+    - pydash
+    - python
+    - six
+
+about:
+  home: http://github.com/wheeler-microfluidics/cpp-delegate
+  license: MIT

@@ -1,0 +1,7 @@
+include RELEASE-VERSION
+include version.py
+include setup.py
+include paver-minilib.zip
+recursive-include cpp_delegate *
+recursive-exclude cpp_delegate *.pyc
+recursive-exclude cpp_delegate *~

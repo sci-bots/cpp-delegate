@@ -87,3 +87,10 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# Paver
+setup.py
+paver-minilib.zip
+
+# Generated version file
+RELEASE-VERSION
