@@ -112,6 +112,33 @@ class RemoteContext(Context, DirMixIn):
         else:
             raise AttributeError
 
+    def __setattr__(self, attr, value):
+        '''
+        If :data:`attr` matches the name of a variable or field in the remote
+        context, set the corresponding value.
+
+        Parameters
+        ----------
+        attr : str
+            Name of attribute in remote context.
+        value : type of attr
+            Value to set for specified attribute in remote context.
+
+        Raises
+        ------
+        TypeError
+            If attribute type is not supported (i.e., not a plain old data
+            type).
+
+        See also
+        --------
+        :meth:`__getattr__`, :meth:`_read_attribute`
+        '''
+        if hasattr(self, '_attributes') and attr in self._attributes:
+            self._write_attribute(attr, value)
+        else:
+            super(RemoteContext, self).__setattr__(attr, value)
+
     def _address_of(self, label):
         '''
         Parameters
@@ -150,6 +177,10 @@ class RemoteContext(Context, DirMixIn):
         -------
         np.array(dtype='uint8')
             Array of data read from remote context.
+
+        See also
+        --------
+        :meth:`_read_attribute`
         '''
         op_code = operation_code('mem_read')
         rec = np.rec.array([op_code, address, size],
@@ -164,6 +195,32 @@ class RemoteContext(Context, DirMixIn):
             pass
         return np.fromstring(self.stream.read(self.stream.in_waiting),
                              dtype='uint8')
+
+    def _mem_write(self, address, data):
+        '''
+        Write data to specified address in remote context.
+
+        Parameters
+        ----------
+        address : int
+            Memory address in remote context.
+        data : numpy.array-like
+            Array or :module:`numpy` data type.
+
+        See also
+        --------
+        :meth:`_write_attribute`
+        '''
+        op_code = operation_code('mem_write')
+        bytes_ = data.tobytes()
+        rec = np.rec.array([op_code, address, len(bytes_), bytes_],
+                           dtype=[('op_code', 'uint16'), ('address', 'uint32'),
+                                  ('size', 'uint16'),
+                                  ('bytes', 'S{}'.format(len(bytes_)))])
+        packet = nq.NadaMq.cPacket(data=rec.tobytes(),
+                                   type_=nq.NadaMq.PACKET_TYPES.DATA)
+
+        self.stream.write(packet.tostring())
 
     def _read_attribute(self, attr, *args):
         '''
@@ -203,6 +260,42 @@ class RemoteContext(Context, DirMixIn):
 
             For each attribute, if type is not supported (i.e., not a plain old
             data type), value is set to ``None``.
+
+        See also
+        --------
+        :meth:`_write_attribute`
         '''
         return py_.map_values(self._attributes, lambda v, k:
                               self._read_attribute(k, None))
+
+    def _write_attribute(self, attr, value):
+        '''
+        Parameters
+        ----------
+        attr : str
+            Name of attribute in remote context.
+        value : type of attr
+            Value to set for specified attribute in remote context.
+
+        Raises
+        ------
+        TypeError
+            If attribute type is not supported (i.e., not a plain old data
+            type).
+
+        See also
+        --------
+        :meth:`_read_attribute`
+        '''
+        address = self._addresses[attr]
+        attr_node = self._attributes[attr]
+        if attr_node['const']:
+            location = attr_node['location']
+            raise AttributeError('Attribute "{}" is read-only (declared as '
+                                 '"const" at `{} (line: {}, col: {})`)'
+                                 .format(attr, location['file'],
+                                         location['start']['line'],
+                                         location['start']['column']))
+        np_dtype = get_np_dtype(attr_node['type'])
+        value = np_dtype.type(value)
+        self._mem_write(address, value)
