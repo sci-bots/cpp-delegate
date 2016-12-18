@@ -74,7 +74,7 @@ template = '''
 {% endfor -%}
 
 {% for name_i, attr_i in attributes.iteritems() %}
-extern {{ 'volatile ' if attr_i.volatile else '' }}{{ 'const ' if attr_i.const else '' }}{{ attr_i.type }} {{ name_i }};
+extern {{ 'volatile ' if attr_i.volatile else '' }}{{ 'const ' if attr_i.const else '' }}{{ attr_i.type if attr_i.kind != 'CONSTANTARRAY' else attr_i.element_type }} {{ name_i }}{%if attr_i.kind == 'CONSTANTARRAY' %}[{{ attr_i.array_size }}]{% endif %};
 {%- endfor %}
 
 inline uint32_t address_of(char const *member_name) {
@@ -100,7 +100,7 @@ def get_attributes(members):
                                               'Teensy3Clock', 'PIND', 'PINC',
                                               'SPCR', 'EIMSK'))
                        and '()' not in v['underlying_type']
-                       and 'ARRAY' not in v['kind']
+                       and 'INCOMPLETEARRAY' not in v['kind']
                        and not k.startswith('__'))
 
 
