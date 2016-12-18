@@ -60,6 +60,16 @@ class RemoteContext(Context, DirMixIn):
     Variables and fields are accessible as Python attributes, allowing, for
     example, tab completion in IPython.
 
+    TODO
+    ----
+
+     - **[ ]** Add read/write support for C array attributes:
+         - **[x]** `CONSTANTARRAY` constant size array
+         - **[ ]** `INCOMPLETEARRAY`
+     - **[ ]** Add read/write support for C constant size array attributes
+     - **[ ]** Add read/write support for ``CArrayDefs.h`` array attributes
+     - **[ ]** Add support to call remote context functions as member functions
+
     Parameters
     ----------
     stream : serial.Serial
@@ -249,14 +259,26 @@ class RemoteContext(Context, DirMixIn):
         has_default = True if args else False
 
         address = self._addresses[attr]
-        try:
-            np_dtype = get_np_dtype(self._attributes[attr]['type'])
-        except TypeError:
-            if has_default:
-                return args[0]
-            raise
-        data = self._mem_read(address, np_dtype.itemsize)
-        return data.view(np_dtype)[0]
+        attribute = self._attributes[attr]
+        if attribute['kind'] == 'CONSTANTARRAY':
+            try:
+                np_dtype = get_np_dtype(attribute['element_type'])
+            except TypeError:
+                if has_default:
+                    return args[0]
+                raise
+            data = self._mem_read(address, attribute['array_size'] *
+                                  np_dtype.itemsize)
+            return data.view(np_dtype)
+        else:
+            try:
+                np_dtype = get_np_dtype(attribute['type'])
+            except TypeError:
+                if has_default:
+                    return args[0]
+                raise
+            data = self._mem_read(address, np_dtype.itemsize)
+            return data.view(np_dtype)[0]
 
     def _read_attributes(self):
         '''
@@ -303,6 +325,15 @@ class RemoteContext(Context, DirMixIn):
                                  .format(attr, location['file'],
                                          location['start']['line'],
                                          location['start']['column']))
-        np_dtype = get_np_dtype(attr_node['type'])
-        value = np_dtype.type(value)
-        self._mem_write(address, value)
+        if attr_node['kind'] == 'CONSTANTARRAY':
+            np_dtype = get_np_dtype(attr_node['element_type'])
+            if len(value) != attr_node['array_size']:
+                raise ValueError('Length of specified value ({}) does not '
+                                 'match remote array length ({}).'
+                                 .format(len(value), attr_node['array_size']))
+            data = np.asarray(value, dtype=np_dtype)
+            self._mem_write(address, data)
+        else:
+            np_dtype = get_np_dtype(attr_node['type'])
+            value = np_dtype.type(value)
+            self._mem_write(address, value)
