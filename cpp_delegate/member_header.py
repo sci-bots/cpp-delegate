@@ -85,8 +85,13 @@ def get_functions(members):
     return [(v['name'], v)
             for v in py_.group_by(members.values(),
                                   lambda v: v['kind'])['FUNCTION_DECL']
-            if v['result_type']
-            and not v['name'].startswith('operator ')
+            if not v['name'].startswith('operator ')
+            and v['name'] not in ('analogWriteDAC1', '_restart_Teensyduino_',
+                                  'init_pins', 'serialEvent4', 'serialEvent5',
+                                  'serialEvent6')
+            and not v['name'].startswith('serial4')
+            and not v['name'].startswith('serial5')
+            and not v['name'].startswith('serial6')
             and not any([a['kind'] == 'POINTER' for a in v['arguments']])
             and all([a['name'] for a in v['arguments']])]
 
