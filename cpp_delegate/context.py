@@ -1,11 +1,13 @@
 import datetime as dt
 import hashlib
+import re
 
 from pydash import py_ as py__
 import nadamq as nq
 import nadamq.NadaMq
 import numpy as np
 import pydash as py_
+import clang_helpers.clang_ast as ca
 
 from .dir_mixin import DirMixIn
 from .address_of import get_attributes
@@ -67,8 +69,7 @@ class RemoteContext(Context, DirMixIn):
      - **[ ]** Add read/write support for C array attributes:
          - **[x]** `CONSTANTARRAY` constant size array
          - **[ ]** `INCOMPLETEARRAY`
-     - **[ ]** Add read/write support for C constant size array attributes
-     - **[ ]** Add read/write support for ``CArrayDefs.h`` array attributes
+     - **[x]** Add read/write support for ``CArrayDefs.h`` array attributes
      - **[ ]** Add support to call remote context functions as member functions
 
     Parameters
@@ -95,6 +96,9 @@ class RemoteContext(Context, DirMixIn):
         super(RemoteContext, self).__init__(cpp_ast_json, namespace=namespace)
         self._addresses = dict([(k, self._address_of(str(k), timeout=timeout))
                                 for k in sorted(self._attributes.keys())])
+        self._carray_dtype = np.dtype([('length', 'uint32'),
+                                       ('data',
+                                        'u{}'.format(self.POINTER_SIZE))])
 
     def __dir__(self):
         '''
@@ -261,7 +265,21 @@ class RemoteContext(Context, DirMixIn):
 
         address = self._addresses[attr]
         attribute = self._attributes[attr]
-        if attribute['kind'] == 'CONSTANTARRAY':
+        if attribute['type'].endswith('Array') and re.match(r'U?Int\d+Array',
+                                                            attribute['type']):
+            data = self._mem_read(address, self._carray_dtype.itemsize)
+            array_class = self._get_class_json(attribute['type'])
+            element_type = array_class['members']['data']['pointee_type']
+            try:
+                np_dtype = get_np_dtype(element_type)
+            except TypeError:
+                if has_default:
+                    return args[0]
+                raise
+            carray = np.rec.array(data, dtype=self._carray_dtype)[0]
+            return self._mem_read(carray['data'], carray['length'] *
+                                  np_dtype.itemsize).view(np_dtype)
+        elif attribute['kind'] == 'CONSTANTARRAY':
             try:
                 np_dtype = get_np_dtype(attribute['element_type'])
             except TypeError:
@@ -326,7 +344,20 @@ class RemoteContext(Context, DirMixIn):
                                  .format(attr, location['file'],
                                          location['start']['line'],
                                          location['start']['column']))
-        if attr_node['kind'] == 'CONSTANTARRAY':
+        if attr_node['type'].endswith('Array') and re.match(r'U?Int\d+Array',
+                                                            attr_node['type']):
+            data = self._mem_read(address, self._carray_dtype.itemsize)
+            array_class = self._get_class_json(attr_node['type'])
+            element_type = array_class['members']['data']['pointee_type']
+            np_dtype = get_np_dtype(element_type)
+            carray = np.rec.array(data, dtype=self._carray_dtype)[0]
+            if len(value) != carray['length']:
+                raise ValueError('Length of specified value ({}) does not '
+                                 'match remote array length ({}).'
+                                 .format(len(value), carray['length']))
+            data = np.asarray(value, dtype=np_dtype)
+            self._mem_write(carray['data'], data)
+        elif attr_node['kind'] == 'CONSTANTARRAY':
             np_dtype = get_np_dtype(attr_node['element_type'])
             if len(value) != attr_node['array_size']:
                 raise ValueError('Length of specified value ({}) does not '
