@@ -50,6 +50,7 @@ class Context(object):
             self.namespace = self.cpp_ast_json
         self._attributes = get_attributes(self.namespace['members'])
         self._functions = get_functions(self.namespace['members'])
+        self._get_class_json = ca.get_class_factory(self.cpp_ast_json)
 
 
 class RemoteContext(Context, DirMixIn):
