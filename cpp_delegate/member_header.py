@@ -22,7 +22,7 @@ typedef struct __attribute__((packed)) {
 {% endfor %}
 
 {%- for name_i, member_i in py_.sort(members) %}
-const int CMD__{{ name_i }} = {{ loop.index0 }};
+const uint32_t CMD__{{ name_i }} = {{ loop.index0 }};
 {%- endfor %}
 '''.strip())
 
