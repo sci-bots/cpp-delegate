@@ -73,12 +73,12 @@ template = '''
 #include "{{ header_i.name }}"
 {% endfor -%}
 
-{% for name_i, attr_i in attributes.iteritems() %}
+{% for name_i, attr_i in py_.sort(attributes.items()) %}
 extern {{ 'volatile ' if attr_i.volatile else '' }}{{ 'const ' if attr_i.const else '' }}{{ attr_i.type if attr_i.kind != 'CONSTANTARRAY' else attr_i.element_type }} {{ name_i }}{%if attr_i.kind == 'CONSTANTARRAY' %}[{{ attr_i.array_size }}]{% endif %};
 {%- endfor %}
 
 inline uint32_t address_of(char const *member_name) {
-    {%- for name_i, attr_i in attributes.iteritems() -%}
+    {%- for name_i, attr_i in py_.sort(attributes.items()) -%}
     {{ ' else ' if loop.index0 else '\n    ' }}if (strcmp(member_name, "{{ name_i }}") == 0) {
         return reinterpret_cast<uint32_t>(&{{ name_i }});
     }
@@ -111,4 +111,4 @@ def render(cpp_ast_json, attributes):
                             namespace_types)
     return jinja2.Template(template).render(attributes=attributes,
                                             namespace_headers=
-                                            namespace_headers)
+                                            namespace_headers, py_=py_)
