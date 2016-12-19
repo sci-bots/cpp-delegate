@@ -186,6 +186,56 @@ class RemoteContext(Context, DirMixIn):
         return np.fromstring(self.stream.read(self.stream.in_waiting),
                              dtype='uint32')[0]
 
+    def _exec(self, function_name, packed_args=None):
+        '''
+        Parameters
+        ----------
+        function_name : str
+            Name of function in remote context.
+        request : np.array(dtype='uint8')
+            Request array containing packed arguments to pass to function in
+            remote context.
+
+        Returns
+        -------
+        np.array(dtype='uint8')
+            Function return data read from remote context.
+        '''
+        # Get function code from remote device.
+        function_code = getattr(self, 'CMD__{}'.format(function_name))
+        # Get operation code for remote execution request.
+        op_code = operation_code('_exec')
+
+        # **TODO** Need to pack args based on function signature.
+        # **NOTE** For now, assuming **no packed arguments**, which is OK for
+        # functions that do not accept any arguments (e.g., `millis`,
+        # `micros`).
+        if packed_args is None:
+            packed_arg_header = (np.rec.array([0, 0], dtype=self._carray_dtype)
+                                 .tobytes())
+            packed_args = np.array([], dtype='uint8').tobytes()
+        else:
+            raise NotImplementedError('**TODO** Need to pack args based on '
+                                      'function signature.')
+
+        rec = np.rec.array([op_code, function_code, packed_arg_header,
+                            packed_args],
+                           dtype=[('op_code', 'uint16'),
+                                  ('function_code', 'uint32'),
+                                  ('request_header',
+                                   'S{}'.format(len(packed_arg_header))),
+                                  ('request',
+                                   'S{}'.format(len(packed_args)))])
+        packet = nq.NadaMq.cPacket(data=rec.tobytes(),
+                                   type_=nq.NadaMq.PACKET_TYPES.DATA)
+
+        self.stream.write(packet.tostring())
+
+        while not self.stream.in_waiting:
+            pass
+        return np.fromstring(self.stream.read(self.stream.in_waiting),
+                             dtype='uint8')
+
     def _mem_read(self, address, size):
         '''
         Parameters
