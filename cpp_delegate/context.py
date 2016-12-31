@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import datetime as dt
 import hashlib
 import re
@@ -31,6 +32,14 @@ def get_np_dtype(type_name, default=False):
             return default
 
 
+f_np_rec_dtype = _fp.map(py_.pipe( _fp.pick(['name', 'type']),
+                                  lambda v: (str(v['name']),
+                                             get_np_dtype(v['type']))))
+f_arg_dtypes = py_.pipe(_fp.get('arguments'), f_np_rec_dtype)
+f_arg_rec_array = py_.pipe(f_arg_dtypes,
+                           lambda a: (lambda *args: np.rec.array(args,
+                                                                 dtype=a)))
+
 operation_code = lambda v: np.fromstring(hashlib.sha256(v).digest(),
                                          dtype='uint8').view('uint16')[0]
 
@@ -51,7 +60,7 @@ class Context(object):
         else:
             self.namespace = self.cpp_ast_json
         self._attributes = get_attributes(self.namespace['members'])
-        self._functions = get_functions(self.namespace['members'])
+        self._functions = OrderedDict(get_functions(self.namespace['members']))
         self._get_class_json = ca.get_class_factory(self.cpp_ast_json)
 
 
@@ -186,7 +195,7 @@ class RemoteContext(Context, DirMixIn):
         return np.fromstring(self.stream.read(self.stream.in_waiting),
                              dtype='uint32')[0]
 
-    def _exec(self, function_name, packed_args=None):
+    def _exec(self, function_name, *args, **kwargs):
         '''
         Parameters
         ----------
@@ -201,6 +210,7 @@ class RemoteContext(Context, DirMixIn):
         np.array(dtype='uint8')
             Function return data read from remote context.
         '''
+        packed_args = kwargs.pop('packed_args', None)
         # Get function code from remote device.
         function_code = getattr(self, 'CMD__{}'.format(function_name))
         # Get operation code for remote execution request.
@@ -211,21 +221,26 @@ class RemoteContext(Context, DirMixIn):
         # functions that do not accept any arguments (e.g., `millis`,
         # `micros`).
         if packed_args is None:
-            packed_arg_header = (np.rec.array([0, 0], dtype=self._carray_dtype)
-                                 .tobytes())
-            packed_args = np.array([], dtype='uint8').tobytes()
-        else:
-            raise NotImplementedError('**TODO** Need to pack args based on '
-                                      'function signature.')
+            if self._functions[function_name]['arguments']:
+                np_rec_dtype = f_arg_dtypes(self._functions[function_name])
+                packed_args = np.rec.array(args, dtype=np_rec_dtype)
+            else:
+                packed_args = np.array([], dtype='uint8')
+        packed_args = packed_args.tobytes()
 
-        rec = np.rec.array([op_code, function_code, packed_arg_header,
-                            packed_args],
-                           dtype=[('op_code', 'uint16'),
-                                  ('function_code', 'uint32'),
-                                  ('request_header',
-                                   'S{}'.format(len(packed_arg_header))),
-                                  ('request',
-                                   'S{}'.format(len(packed_args)))])
+        request_header_types = [('op_code', 'uint16'),
+                                ('function_code', 'uint32'),
+                                ('request_header',
+                                 'S{}'.format(self._carray_dtype.itemsize)),
+                                ('request',
+                                 'S{}'.format(len(packed_args)))]
+        packet_header_size = np.dtype(request_header_types[:-1]).itemsize
+        packed_arg_header = np.rec.array([len(packed_args),  # length
+                                          packet_header_size], # offset
+                                         dtype=self._carray_dtype)
+        rec = np.rec.array([op_code, function_code,
+                            packed_arg_header.tobytes(), packed_args],
+                           dtype=request_header_types)
         packet = nq.NadaMq.cPacket(data=rec.tobytes(),
                                    type_=nq.NadaMq.PACKET_TYPES.DATA)
 
