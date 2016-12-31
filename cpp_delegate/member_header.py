@@ -36,7 +36,7 @@ UInt8Array exec__CMD__{{ name_i }}(UInt8Array request_arr) {
     {%- if member_i.arguments %}
     {{ name_i }}__Request &request = *(reinterpret_cast
                                         <{{ name_i }}__Request *>
-                                        (&request_arr.data[2]));
+                                        (&request_arr.data[0]));
     {%- endif %}
     {% if member_i.result_type %}
     {{ name_i }}__Response response;
