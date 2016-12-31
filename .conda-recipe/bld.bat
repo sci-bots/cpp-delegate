@@ -1,4 +1,10 @@
 @echo off
+setlocal enableextensions
+md "%PREFIX%"\Library\include\Arduino
+endlocal
+xcopy /S /Y /I /Q "%SRC_DIR%"\include\Arduino\CppDelegate "%PREFIX%"\Library\include\Arduino\CppDelegate
+
+@echo off
 REM Generate `setup.py` from `pavement.py` definition.
 "%PYTHON%" -m paver generate_setup
 

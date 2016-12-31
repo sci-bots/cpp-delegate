@@ -1,3 +1,6 @@
+mkdir -p "${PREFIX}"/include/Arduino
+cp -ra "${SRC_DIR}"/include/Arduino/CppDelegate "${PREFIX}"/include/Arduino/CppDelegate
+
 # Generate `setup.py` from `pavement.py` definition.
 "${PYTHON}" -m paver generate_setup
 
