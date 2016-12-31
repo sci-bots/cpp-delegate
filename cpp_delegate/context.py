@@ -15,6 +15,8 @@ _fp = py__()
 
 
 def get_np_dtype(type_name, default=False):
+    if type_name == 'float':
+        return np.dtype('float32')
     for type_i in (type_name, type_name[:-2]):
         try:
             return np.dtype(type_i)
