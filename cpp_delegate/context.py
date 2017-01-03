@@ -211,10 +211,6 @@ class RemoteContext(Context, DirMixIn):
             Function return data read from remote context.
         '''
         packed_args = kwargs.pop('packed_args', None)
-        # Get function code from remote device.
-        function_code = getattr(self, 'CMD__{}'.format(function_name))
-        # Get operation code for remote execution request.
-        op_code = operation_code('_exec')
 
         # **TODO** Need to pack args based on function signature.
         # **NOTE** For now, assuming **no packed arguments**, which is OK for
@@ -223,11 +219,51 @@ class RemoteContext(Context, DirMixIn):
         if packed_args is None:
             if self._functions[function_name]['arguments']:
                 np_rec_dtype = f_arg_dtypes(self._functions[function_name])
-                packed_args = np.rec.array(args, dtype=np_rec_dtype)
+                args_struct = np.rec.array(args, dtype=np_rec_dtype)
             else:
-                packed_args = np.array([], dtype='uint8')
-        packed_args = packed_args.tobytes()
+                args_struct = None
 
+        packet = self._exec_packet(function_name, args_struct)
+        return self._query_exec_packet(packet)
+
+    def _query_exec_packet(self, packet):
+        '''
+        Send packet and wait for response.
+
+        Parameters
+        ----------
+        nadamq.NadaMq.cPacket
+
+        Returns
+        -------
+        np.array(dtype='uint8')
+            Response data from stream.
+        '''
+        self.stream.write(packet.tostring())
+
+        while not self.stream.in_waiting:
+            pass
+        return np.fromstring(self.stream.read(self.stream.in_waiting),
+                             dtype='uint8')
+
+    def _exec_packet(self, function_name, args_struct):
+        '''
+        Parameters
+        ----------
+        function_name : str
+            Name of function in remote context.
+        args_struct : np.rec.array or None
+            Structure containing named arguments to pass to function.
+
+            ``None`` if no arguments are to be passed.
+
+        Returns
+        -------
+        nadamq.NadaMq.cPacket
+            Packet to send to execute specified function with provided
+            arguments.
+        '''
+        packed_args = b'' if args_struct is None else args_struct.tobytes()
         request_header_types = [('op_code', 'uint16'),
                                 ('function_code', 'uint32'),
                                 ('request_header',
@@ -238,18 +274,18 @@ class RemoteContext(Context, DirMixIn):
         packed_arg_header = np.rec.array([len(packed_args),  # length
                                           packet_header_size], # offset
                                          dtype=self._carray_dtype)
+
+        # Get function code from remote device.
+        function_code = getattr(self, 'CMD__{}'.format(function_name))
+
+        # Get operation code for remote execution request.
+        op_code = operation_code('_exec')
+
         rec = np.rec.array([op_code, function_code,
                             packed_arg_header.tobytes(), packed_args],
                            dtype=request_header_types)
-        packet = nq.NadaMq.cPacket(data=rec.tobytes(),
-                                   type_=nq.NadaMq.PACKET_TYPES.DATA)
-
-        self.stream.write(packet.tostring())
-
-        while not self.stream.in_waiting:
-            pass
-        return np.fromstring(self.stream.read(self.stream.in_waiting),
-                             dtype='uint8')
+        return nq.NadaMq.cPacket(data=rec.tobytes(),
+                                 type_=nq.NadaMq.PACKET_TYPES.DATA)
 
     def _mem_read(self, address, size):
         '''
