@@ -102,6 +102,13 @@ def parse_cpp_ast(source, env):
     # Get include paths from build environment.
     cpppath_dirs = [ph.path(env[i[1:]] if i.startswith('$') else i)
                     for i in env['CPPPATH']]
+    if env["CC"] == "arm-none-eabi-gcc":
+        # Explicitly add parent dir of `stdint.h` to list of include paths.
+        gcc_include_dir = (ph.path(env['PIOHOME_DIR']).realpath()
+                           .joinpath('packages', 'toolchain-gccarmnoneeabi',
+                                     'arm-none-eabi', 'include'))
+        if gcc_include_dir.isdir():
+            cpppath_dirs += [gcc_include_dir]
     cpppath_flags = ['-I{}'.format(p) for p in cpppath_dirs]
 
     print 'CPPPATH_FLAGS:'
