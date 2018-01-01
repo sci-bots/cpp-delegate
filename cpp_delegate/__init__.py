@@ -28,6 +28,9 @@ def dump_address_of_header(env, cpp_ast_json):
     lib_dir.makedirs_p()
 
     output_path = lib_dir.joinpath('AddressOf.h')
+    print ('[{name}] write to: {output_path}'
+           .format(name='.'.join([__name__, 'dump_address_of_header']),
+                   output_path=output_path))
 
     attributes = get_attributes(cpp_ast_json['members'])
     header_content = render(cpp_ast_json, attributes)
