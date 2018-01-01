@@ -116,7 +116,7 @@ def parse_cpp_ast(source, env):
 def test(v):
     try:
         json.dumps(v)
-    except:
+    except Exception:
         return False
     else:
         return True
