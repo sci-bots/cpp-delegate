@@ -94,9 +94,16 @@ inline uint32_t address_of(char const *member_name) {
 '''
 
 
+def isindir(root, file_path):
+    root = ph.path(root).realpath()
+    file_path = ph.path(file_path).realpath()
+    return not root.relpathto(file_path).startswith('..')
+
+
 def get_attributes(members):
     return py_.pick_by(members, lambda v, k:
                        (v['kind'] not in ('FUNCTION_DECL', 'CXX_METHOD'))
+                       and (ph.path(v['location']['file']).parent.parent.name != 'arm-none-eabi')
                        and (v['name'] not in ('SREG', 'DDRB', 'DDRC', 'DDRD',
                                               'SPDR', 'SPSR', 'Serial6',
                                               'Serial5', 'Serial4', 'PORTB',
