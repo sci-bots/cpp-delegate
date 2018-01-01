@@ -90,10 +90,6 @@ def dump_address_of_header(env, cpp_ast_json):
 
 
 def parse_cpp_ast(source, env):
-    # Get include paths from build environment.
-    cpppath_dirs = [ph.path(env[i[1:]] if i.startswith('$') else i)
-                    for i in env['CPPPATH']]
-    cpppath_flags = ['-I{}'.format(p) for p in cpppath_dirs]
     # Get define flags from build environment.
     defines = [[env[d_i[1:]] if d_i.startswith('$') else d_i
                 for d_i in map(str, d)] for d in env['CPPDEFINES']]
@@ -102,6 +98,12 @@ def parse_cpp_ast(source, env):
         defines += [[k] for k in ('KINETISK', '__arm__')
                     if k not in define_keys]
     define_flags = ['-D{}'.format(' '.join(map(str, d))) for d in defines]
+
+    # Get include paths from build environment.
+    cpppath_dirs = [ph.path(env[i[1:]] if i.startswith('$') else i)
+                    for i in env['CPPPATH']]
+    cpppath_flags = ['-I{}'.format(p) for p in cpppath_dirs]
+
     print 'CPPPATH_FLAGS:'
     for p in cpppath_dirs:
         print 3 * ' ', '{} {}'.format(p, p.isdir())
