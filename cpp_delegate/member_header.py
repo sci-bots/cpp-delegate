@@ -64,7 +64,7 @@ UInt8Array operator () (uint32_t value, UInt8Array request_arr) {
     switch (value) {
 {% for name_i, member_i in py_.sort(members) %}
         case CMD__{{ name_i }}:
-            return exec__CMD__{{ name_i }}(request_arr);
+            return exec__CMD__{{ name_i }}(request_arr);  // {{ member_i.result_type }} {{ name_i }}({% for a in member_i.arguments %}{{ ', ' if loop.index0 > 0 else ''}}{{ a.type }} {{ a.name }}{% endfor %}) ({{ member_i.location }})
             break;
 {% endfor %}
         default:
