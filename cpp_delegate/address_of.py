@@ -78,7 +78,7 @@ template = '''
 {% endfor -%}
 
 {% for name_i, attr_i in py_.sort(attributes.items()) %}
-extern {{ 'volatile ' if attr_i.volatile else '' }}{{ 'const ' if attr_i.const else '' }}{{ attr_i.type if attr_i.kind != 'CONSTANTARRAY' else attr_i.element_type }} {{ name_i }}{%if attr_i.kind == 'CONSTANTARRAY' %}[{{ attr_i.array_size }}]{% endif %};
+extern {{ 'volatile ' if attr_i.volatile else '' }}{{ 'const ' if attr_i.const else '' }}{{ attr_i.type if attr_i.kind != 'CONSTANTARRAY' else attr_i.element_type }} {{ name_i }}{%if attr_i.kind == 'CONSTANTARRAY' %}[{{ attr_i.array_size }}]{% endif %};  // {{ attr_i.location }}
 {%- endfor %}
 
 inline uint32_t address_of(char const *member_name) {
