@@ -11,6 +11,11 @@ from .context import Context
 
 
 def dump_cpp_ast(env):
+    '''
+    Parameters
+    ----------
+    env : SCons.Script.SConscript.SConsEnvironment
+    '''
     project_dir = ph.path(env['PROJECT_DIR'])
     project_name = project_dir.name.replace('-', '__')
     lib_dir = project_dir.joinpath('lib', project_name)
@@ -51,6 +56,18 @@ def _isindir(root, file_path):
 
 
 def dump_execute_py(env, cpp_ast_json):
+    '''
+    Parameters
+    ----------
+    env : SCons.Script.SConscript.SConsEnvironment
+    cpp_ast_json : dict
+        C++ source abstract syntax tree.
+
+    Returns
+    -------
+    str
+        Python bindings code.
+    '''
     project_dir = ph.path(env['PROJECT_DIR'])
     project_name = project_dir.name.replace('-', '__')
     lib_dir = project_dir.joinpath('bindings', 'python', project_name)
@@ -72,6 +89,18 @@ def dump_execute_py(env, cpp_ast_json):
 
 
 def dump_address_of_header(env, cpp_ast_json):
+    '''
+    Parameters
+    ----------
+    env : SCons.Script.SConscript.SConsEnvironment
+    cpp_ast_json : dict
+        C++ source abstract syntax tree.
+
+    Returns
+    -------
+    str
+        Contents of C++ header defining address of each addressable attribute.
+    '''
     project_dir = ph.path(env['PROJECT_DIR'])
     project_name = project_dir.name.replace('-', '__')
     lib_dir = project_dir.joinpath('lib', project_name)
@@ -97,6 +126,18 @@ def dump_address_of_header(env, cpp_ast_json):
 
 
 def parse_cpp_ast(source, env):
+    '''
+    Parameters
+    ----------
+    source : str
+        C++ source file path.
+    env : SCons.Script.SConscript.SConsEnvironment
+
+    Returns
+    -------
+    dict
+        C++ source abstract syntax tree.
+    '''
     # Get define flags from build environment.
     defines = [[env[d_i[1:]] if d_i.startswith('$') else d_i
                 for d_i in map(str, d)] for d in env['CPPDEFINES']]
