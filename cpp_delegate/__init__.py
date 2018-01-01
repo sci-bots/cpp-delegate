@@ -115,7 +115,7 @@ def parse_cpp_ast(source, env):
     for p in cpppath_dirs:
         print 3 * ' ', '{} {}'.format(p, p.isdir())
     print 'DEFINE_FLAGS:'
-    for d in defines:
+    for d in define_flags:
         print 3 * ' ', d
 
     return ca.parse_cpp_ast(source, *(define_flags + cpppath_flags),
