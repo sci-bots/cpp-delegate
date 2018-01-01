@@ -32,9 +32,9 @@ def get_np_dtype(type_name, default=False):
             return default
 
 
-f_np_rec_dtype = _fp.map(py_.pipe( _fp.pick(['name', 'type']),
+f_np_rec_dtype = _fp.map(py_.pipe(_fp.pick(['name', 'type']),
                                   lambda v: (str(v['name']),
-                                             get_np_dtype(v['type']))))
+                                             get_np_dtype(v['type'], default=None))))
 f_arg_dtypes = py_.pipe(_fp.get('arguments'), f_np_rec_dtype)
 f_arg_rec_array = py_.pipe(f_arg_dtypes,
                            lambda a: (lambda *args: np.rec.array(args,
