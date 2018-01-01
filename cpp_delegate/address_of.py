@@ -1,3 +1,5 @@
+import logging
+
 from pydash import py_ as py__
 import clang_helpers as ch
 import jinja2
@@ -5,6 +7,8 @@ import path_helpers as ph
 import pydash as py_
 
 _fp = py__()
+
+logger = logging.getLogger(name=__name__)
 
 # **TODO**: Move `get_typedef_path` and `get_typedef_factory` into
 # `clang_helpers.clang_ast` module.
@@ -107,8 +111,13 @@ def get_attributes(members):
 def render(cpp_ast_json, attributes):
     namespace_types = [v['type'] for k, v in attributes.iteritems()
                        if '::' in v['type']]
-    namespace_headers = map(lambda v: get_definition_header(cpp_ast_json, v),
-                            namespace_types)
+    namespace_headers = []
+    for namespace_type_i in namespace_types:
+        try:
+            namespace_headers += [get_definition_header(cpp_ast_json,
+                                                        namespace_type_i)]
+        except IOError:
+            logger.debug('Definition header not found (%s).', namespace_type_i)
     return jinja2.Template(template).render(attributes=attributes,
                                             namespace_headers=
                                             namespace_headers, py_=py_)
