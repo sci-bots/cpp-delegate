@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import gzip
 import json
 
 import clang_helpers.clang_ast as ca
@@ -23,7 +24,8 @@ def dump_cpp_ast(env):
         main_c_file = project_dir.joinpath('main.cpp')
     cpp_ast_json = parse_cpp_ast(main_c_file, env)
 
-    with lib_dir.joinpath('cpp_ast.json').open('w') as output:
+    output_path = lib_dir.joinpath('cpp_ast.json.gz')
+    with gzip.open(output_path, 'wb') as output:
         json.dump(cpp_ast_json, output, indent=2)
     return cpp_ast_json
 
