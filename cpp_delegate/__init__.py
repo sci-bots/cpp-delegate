@@ -15,7 +15,12 @@ def dump_cpp_ast(env):
     lib_dir = project_dir.joinpath('lib', project_name)
     lib_dir.makedirs_p()
 
-    main_c_file = ph.path(env['PROJECTSRC_DIR']).joinpath('main.cpp')
+    project_dir = ph.path(env['PROJECTSRC_DIR']).realpath()
+    if project_dir.files('*.ino'):
+        # Project is an Arduino sketch
+        main_c_file = ph.path(env['PROJECTSRC_DIR']).files('*.ino.cpp')[0]
+    else:
+        main_c_file = project_dir.joinpath('main.cpp')
     cpp_ast_json = parse_cpp_ast(main_c_file, env)
 
     with lib_dir.joinpath('cpp_ast.json').open('w') as output:
