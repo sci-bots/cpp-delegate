@@ -4,6 +4,8 @@ import json
 import clang_helpers.clang_ast as ca
 import path_helpers as ph
 
+from .address_of import get_attributes, render
+
 
 def dump_cpp_ast(env):
     project_dir = ph.path(env['PROJECT_DIR'])
@@ -16,6 +18,52 @@ def dump_cpp_ast(env):
 
     with lib_dir.joinpath('cpp_ast.json').open('w') as output:
         json.dump(cpp_ast_json, output, indent=2)
+    return cpp_ast_json
+
+
+def _isindir(root, file_path):
+    '''
+    Parameters
+    ----------
+    root : str
+        Root directory.
+    file_path : str
+        File to test for membership in root.
+
+    Returns
+    -------
+    bool
+        ``True`` if file is contained within directory structure under
+        specified root.
+    '''
+    root = ph.path(root).realpath()
+    file_path = ph.path(file_path).realpath()
+    return not root.relpathto(file_path).startswith('..')
+
+
+def dump_address_of_header(env, cpp_ast_json):
+    project_dir = ph.path(env['PROJECT_DIR'])
+    project_name = project_dir.name.replace('-', '__')
+    lib_dir = project_dir.joinpath('lib', project_name)
+    lib_dir.makedirs_p()
+
+    output_path = lib_dir.joinpath('AddressOf.h')
+    print ('[{name}] write to: {output_path}'
+           .format(name='.'.join([__name__, 'dump_address_of_header']),
+                   output_path=output_path))
+
+    attributes = get_attributes(cpp_ast_json['members'])
+    # Path to ARM toolchain.
+    toolchain_dir = ph.path(env['PIOHOME_DIR']).joinpath('packages',
+                                                         'toolchain-'
+                                                         'gccarmnoneeabi')
+    attributes = {k: v for k, v in attributes.iteritems()
+                  if not _isindir(toolchain_dir, v['location']['file'])}
+    header_content = render(cpp_ast_json, attributes)
+
+    with output_path.open('w') as output:
+        output.write(header_content)
+    return header_content
 
 
 def parse_cpp_ast(source, env):

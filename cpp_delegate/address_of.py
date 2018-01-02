@@ -1,3 +1,5 @@
+import logging
+
 from pydash import py_ as py__
 import clang_helpers as ch
 import jinja2
@@ -5,6 +7,8 @@ import path_helpers as ph
 import pydash as py_
 
 _fp = py__()
+
+logger = logging.getLogger(name=__name__)
 
 # **TODO**: Move `get_typedef_path` and `get_typedef_factory` into
 # `clang_helpers.clang_ast` module.
@@ -73,12 +77,12 @@ template = '''
 #include "{{ header_i.name }}"
 {% endfor -%}
 
-{% for name_i, attr_i in attributes.iteritems() %}
-extern {{ 'volatile ' if attr_i.volatile else '' }}{{ 'const ' if attr_i.const else '' }}{{ attr_i.type }} {{ name_i }};
+{% for name_i, attr_i in py_.sort(attributes.items()) %}
+extern {{ 'volatile ' if attr_i.volatile else '' }}{{ 'const ' if attr_i.const else '' }}{{ attr_i.type if attr_i.kind != 'CONSTANTARRAY' else attr_i.element_type }} {{ name_i }}{%if attr_i.kind == 'CONSTANTARRAY' %}[{{ attr_i.array_size }}]{% endif %};  // {{ attr_i.location }}
 {%- endfor %}
 
 inline uint32_t address_of(char const *member_name) {
-    {%- for name_i, attr_i in attributes.iteritems() -%}
+    {%- for name_i, attr_i in py_.sort(attributes.items()) -%}
     {{ ' else ' if loop.index0 else '\n    ' }}if (strcmp(member_name, "{{ name_i }}") == 0) {
         return reinterpret_cast<uint32_t>(&{{ name_i }});
     }
@@ -91,6 +95,24 @@ inline uint32_t address_of(char const *member_name) {
 
 
 def get_attributes(members):
+    '''
+    Filter members to only include supported attributes, removing, e.g.,
+    methods and functions.
+
+    Parameters
+    ----------
+    members : dict
+        ``"members"`` value from C++ abstract syntax tree namespace.
+
+    Returns
+    -------
+    dict
+        Filtered ``"members"`` value containing only supported attributes.
+
+    .. versionchanged:: ????
+        Exclude ``TWBR`` (defined in ``Wire.h``), since it causes a compile
+        error.
+    '''
     return py_.pick_by(members, lambda v, k:
                        (v['kind'] not in ('FUNCTION_DECL', 'CXX_METHOD'))
                        and (v['name'] not in ('SREG', 'DDRB', 'DDRC', 'DDRD',
@@ -98,17 +120,39 @@ def get_attributes(members):
                                               'Serial5', 'Serial4', 'PORTB',
                                               'PORTD', 'PORTC', 'PINB',
                                               'Teensy3Clock', 'PIND', 'PINC',
-                                              'SPCR', 'EIMSK'))
+                                              'SPCR', 'EIMSK', 'TWBR'))
                        and '()' not in v['underlying_type']
-                       and 'ARRAY' not in v['kind']
+                       and 'INCOMPLETEARRAY' not in v['kind']
                        and not k.startswith('__'))
 
 
 def render(cpp_ast_json, attributes):
+    '''
+    Render ``AddressOf.h`` contents for the specified attributes.
+
+    Parameters
+    ----------
+    cpp_ast_json : dict
+        JSON-friendly C++ source abstract syntax tree (AST).
+    attributes : dict
+        Attributes within a namespace of the C++ AST.
+
+        See also :func:`get_attributes`.
+
+    Returns
+    -------
+    str
+        Rendered ``AddressOf.h`` contents.
+    '''
     namespace_types = [v['type'] for k, v in attributes.iteritems()
                        if '::' in v['type']]
-    namespace_headers = map(lambda v: get_definition_header(cpp_ast_json, v),
-                            namespace_types)
+    namespace_headers = []
+    for namespace_type_i in namespace_types:
+        try:
+            namespace_headers += [get_definition_header(cpp_ast_json,
+                                                        namespace_type_i)]
+        except IOError:
+            logger.debug('Definition header not found (%s).', namespace_type_i)
     return jinja2.Template(template).render(attributes=attributes,
                                             namespace_headers=
-                                            namespace_headers)
+                                            namespace_headers, py_=py_)
