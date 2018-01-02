@@ -15,7 +15,7 @@ setup(name='cpp-delegate',
       url='https://github.com/wheeler-microfluidics/cpp-delegate',
       license='MIT',
       packages=['cpp_delegate'],
-      install_requires=['clang-helpers', 'jinja2', 'nadamq', 'numpy',
+      install_requires=['clang-helpers>=0.5', 'jinja2', 'nadamq', 'numpy',
                         'path-helpers', 'pydash', 'six'],
       # Install data listed in `MANIFEST.in`
       include_package_data=True)

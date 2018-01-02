@@ -7,7 +7,7 @@ channels: !!python/tuple
 - !!python/unicode
   'defaults'
 dependencies:
-- clang-helpers
+- clang-helpers >=0.5
 - jinja2
 - nadamq
 - numpy
