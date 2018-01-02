@@ -22,43 +22,62 @@ typedef struct __attribute__((packed)) {
 {% endfor %}
 
 {%- for name_i, member_i in py_.sort(members) %}
-const int CMD__{{ name_i }} = {{ loop.index0 }};
+const uint32_t CMD__{{ name_i }} = {{ loop.index0 }};
 {%- endfor %}
 '''.strip())
 
 member_switch_template = jinja2.Template(r'''
-inline UInt8Array test(uint32_t value, UInt8Array request_arr) {
+class Exec {
+{% for name_i, member_i in py_.sort(members) %}
+UInt8Array exec__CMD__{{ name_i }}(UInt8Array request_arr) {
     UInt8Array result = request_arr;
-    switch (value) {
-    {% for name_i, member_i in py_.sort(members) %}
-        case CMD__{{ name_i }}:
-            // {{ member_i.location }}
-            {
-                {%- if member_i.arguments %}
-                {{ name_i }}__Request &request = *(reinterpret_cast
-                                                   <{{ name_i }}__Request *>
-                                                   (&request_arr.data[2]));
-                {%- endif %}
-                {%- if member_i.result_type %}
-                {{ name_i }}__Response response;
+    // {{ member_i.result_type }} {{ name_i }}({% for a in member_i.arguments %}{{ ', ' if loop.index0 > 0 else ''}}{{ a.type }} {{ a.name }}{% endfor %});
+    // {{ member_i.location }}
+    {%- if member_i.arguments %}
+    {{ name_i }}__Request &request = *(reinterpret_cast
+                                        <{{ name_i }}__Request *>
+                                        (&request_arr.data[0]));
+    {%- endif %}
+    {% if member_i.result_type %}
+    {{ name_i }}__Response response;
 
-                response.result = {% endif -%}
-                {{ name_i }}({% for a in member_i.arguments %}{{ ', ' if loop.index0 > 0 else ''}}/* {{ a.type }} */ request.{{ a.name }}{% endfor %});
+    response.result = {% endif -%}
+    {{ name_i }}({% for a in member_i.arguments %}{{ ', ' if loop.index0 > 0 else ''}}/* {{ a.type }} */ request.{{ a.name }}{% endfor %});
 
-                /* Copy result to output buffer. */
-                /* Cast start of buffer as reference of result type and assign result. */
-                {{ name_i }}__Response &output = *(reinterpret_cast
-                                                   <{{ name_i }}__Response *>
-                                                   (&request_arr.data[0]));
-                output = response;
-                result.data = request_arr.data;
-                result.length = sizeof(output);
-            }
-            break;
-    {%- endfor -%}
-    }
+    {%- if member_i.result_type %}
+    /* Copy result to output buffer. */
+    /* Cast start of buffer as reference of result type and assign result. */
+    {{ name_i }}__Response &output = *(reinterpret_cast
+                                        <{{ name_i }}__Response *>
+                                        (&request_arr.data[0]));
+    output = response;
+    result.data = request_arr.data;
+    result.length = sizeof(output);
+    {% else %}
+    result = UInt8Array_init_default();
+    {% endif %}
     return result;
 }
+{%- endfor %}
+public:
+UInt8Array operator () (uint32_t value, UInt8Array request_arr) {
+    switch (value) {
+{% for name_i, member_i in py_.sort(members) %}
+        case CMD__{{ name_i }}:
+            return exec__CMD__{{ name_i }}(request_arr);  // {{ member_i.result_type }} {{ name_i }}({% for a in member_i.arguments %}{{ ', ' if loop.index0 > 0 else ''}}{{ a.type }} {{ a.name }}{% endfor %}) ({{ member_i.location }})
+            break;
+{% endfor %}
+        default:
+        {
+            UInt8Array result;
+            result.data = request_arr.data;
+            result.length = 0;
+            return result;
+        }
+    }
+    return UInt8Array_init_default();
+}
+};
 '''.strip())
 
 
@@ -66,8 +85,13 @@ def get_functions(members):
     return [(v['name'], v)
             for v in py_.group_by(members.values(),
                                   lambda v: v['kind'])['FUNCTION_DECL']
-            if v['result_type']
-            and not v['name'].startswith('operator ')
+            if not v['name'].startswith('operator ')
+            and v['name'] not in ('analogWriteDAC1', '_restart_Teensyduino_',
+                                  'init_pins', 'serialEvent4', 'serialEvent5',
+                                  'serialEvent6')
+            and not v['name'].startswith('serial4')
+            and not v['name'].startswith('serial5')
+            and not v['name'].startswith('serial6')
             and not any([a['kind'] == 'POINTER' for a in v['arguments']])
             and all([a['name'] for a in v['arguments']])]
 

@@ -5,6 +5,8 @@ import clang_helpers.clang_ast as ca
 import path_helpers as ph
 
 from .address_of import get_attributes, render
+from .execute import render as exe_render
+from .context import Context
 
 
 def dump_cpp_ast(env):
@@ -39,6 +41,27 @@ def _isindir(root, file_path):
     root = ph.path(root).realpath()
     file_path = ph.path(file_path).realpath()
     return not root.relpathto(file_path).startswith('..')
+
+
+def dump_execute_py(env, cpp_ast_json):
+    project_dir = ph.path(env['PROJECT_DIR'])
+    project_name = project_dir.name.replace('-', '__')
+    lib_dir = project_dir.joinpath('bindings', 'python', project_name)
+    lib_dir.makedirs_p()
+
+    ctx = Context(cpp_ast_json)
+
+    # Generate Python code for each function to pack arguments, call function,
+    # and unpack result.
+    python_code = exe_render(ctx._functions)
+
+    # Create `__init__.py` if it doesn't exist.
+    lib_dir.joinpath('__init__.py').touch()
+
+    # Write generated Python code to `execute.py`.
+    with lib_dir.joinpath('execute.py').open('w') as output:
+        output.write(python_code)
+    return python_code
 
 
 def dump_address_of_header(env, cpp_ast_json):
