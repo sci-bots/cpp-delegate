@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import gzip
 import json
 
 import clang_helpers.clang_ast as ca
@@ -9,16 +10,47 @@ from .execute import render as exe_render
 from .context import Context
 
 
-def dump_cpp_ast(env):
+def dump_cpp_ast(env, exclude_dirs=None):
+    '''
+    Parameters
+    ----------
+    env : SCons.Script.SConscript.SConsEnvironment
+    exclude_dirs : list, optional
+        Exclude classes and attributes found in headers within any specified
+        directory during abstract syntax tree scan.
+
+    Returns
+    -------
+    cpp_ast_json : dict
+        JSON-friendly C++ source abstract syntax tree.
+    '''
+    if exclude_dirs is None:
+        exclude_dirs = []
+
     project_dir = ph.path(env['PROJECT_DIR'])
     project_name = project_dir.name.replace('-', '__')
     lib_dir = project_dir.joinpath('lib', project_name)
     lib_dir.makedirs_p()
 
-    main_c_file = ph.path(env['PROJECTSRC_DIR']).joinpath('main.cpp')
+    project_dir = ph.path(env['PROJECTSRC_DIR']).realpath()
+    if project_dir.files('*.ino'):
+        # Project is an Arduino sketch
+        main_c_file = ph.path(env['PROJECTSRC_DIR']).files('*.ino.cpp')[0]
+    else:
+        main_c_file = project_dir.joinpath('main.cpp')
     cpp_ast_json = parse_cpp_ast(main_c_file, env)
 
-    with lib_dir.joinpath('cpp_ast.json').open('w') as output:
+    # Exclude members from specified exclude dirs.
+    selected_members = {name_i: member_i
+                        for name_i, member_i in
+                        cpp_ast_json['members'].iteritems()
+                        if not any([_isindir(exclude_dir_j,
+                                             member_i['location']['file'])
+                                    for exclude_dir_j in exclude_dirs])}
+    cpp_ast_json['members'] = selected_members
+
+    output_path = lib_dir.joinpath('cpp_ast.json.gz')
+    with gzip.open(output_path, 'wb') as output:
         json.dump(cpp_ast_json, output, indent=2)
     return cpp_ast_json
 
@@ -44,6 +76,18 @@ def _isindir(root, file_path):
 
 
 def dump_execute_py(env, cpp_ast_json):
+    '''
+    Parameters
+    ----------
+    env : SCons.Script.SConscript.SConsEnvironment
+    cpp_ast_json : dict
+        C++ source abstract syntax tree.
+
+    Returns
+    -------
+    str
+        Python bindings code.
+    '''
     project_dir = ph.path(env['PROJECT_DIR'])
     project_name = project_dir.name.replace('-', '__')
     lib_dir = project_dir.joinpath('bindings', 'python', project_name)
@@ -65,6 +109,18 @@ def dump_execute_py(env, cpp_ast_json):
 
 
 def dump_address_of_header(env, cpp_ast_json):
+    '''
+    Parameters
+    ----------
+    env : SCons.Script.SConscript.SConsEnvironment
+    cpp_ast_json : dict
+        C++ source abstract syntax tree.
+
+    Returns
+    -------
+    str
+        Contents of C++ header defining address of each addressable attribute.
+    '''
     project_dir = ph.path(env['PROJECT_DIR'])
     project_name = project_dir.name.replace('-', '__')
     lib_dir = project_dir.joinpath('lib', project_name)
@@ -90,6 +146,18 @@ def dump_address_of_header(env, cpp_ast_json):
 
 
 def parse_cpp_ast(source, env):
+    '''
+    Parameters
+    ----------
+    source : str
+        C++ source file path.
+    env : SCons.Script.SConscript.SConsEnvironment
+
+    Returns
+    -------
+    dict
+        C++ source abstract syntax tree.
+    '''
     # Get define flags from build environment.
     defines = [[env[d_i[1:]] if d_i.startswith('$') else d_i
                 for d_i in map(str, d)] for d in env['CPPDEFINES']]
