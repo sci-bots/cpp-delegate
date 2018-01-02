@@ -108,6 +108,10 @@ def get_attributes(members):
     -------
     dict
         Filtered ``"members"`` value containing only supported attributes.
+
+    .. versionchanged:: ????
+        Exclude ``TWBR`` (defined in ``Wire.h``), since it causes a compile
+        error.
     '''
     return py_.pick_by(members, lambda v, k:
                        (v['kind'] not in ('FUNCTION_DECL', 'CXX_METHOD'))
@@ -116,7 +120,7 @@ def get_attributes(members):
                                               'Serial5', 'Serial4', 'PORTB',
                                               'PORTD', 'PORTC', 'PINB',
                                               'Teensy3Clock', 'PIND', 'PINC',
-                                              'SPCR', 'EIMSK'))
+                                              'SPCR', 'EIMSK', 'TWBR'))
                        and '()' not in v['underlying_type']
                        and 'INCOMPLETEARRAY' not in v['kind']
                        and not k.startswith('__'))
