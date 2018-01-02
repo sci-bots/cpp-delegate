@@ -5,6 +5,8 @@ import json
 import clang_helpers.clang_ast as ca
 import path_helpers as ph
 
+from .class_delegate import (get_methods, render_class_delegate,
+                             render_method_delegate)
 from .address_of import get_attributes, render
 from .execute import render as exe_render
 from .context import Context
@@ -205,3 +207,59 @@ def dump_env(env):
         json_safe_env = OrderedDict(sorted([(k, v) for k, v in env.items()
                                             if test(v)]))
         json.dump(json_safe_env, output, indent=4)
+
+
+def dump_class_delegate_headers(env, cpp_ast_json):
+    '''
+    Generate class delegate headers under the following path:
+
+        lib/<project name>/classes
+
+    Parameters
+    ----------
+    env : SCons.Script.SConscript.SConsEnvironment
+    cpp_ast_json : dict
+        JSON-friendly C++ source abstract syntax tree.
+
+        See also :func:`dump_cpp_ast`.
+    '''
+    project_dir = ph.path(env['PROJECT_DIR'])
+    # Generate C++ namespace-friendly project name.
+    project_name = project_dir.name.replace('-', '__')
+    header_lib_dir = project_dir.joinpath('lib', project_name)
+
+    # Get list of classes.
+    classes = OrderedDict(sorted([(k, v) for k, v in
+                                  cpp_ast_json['classes'].items()
+                                  if k not in ('_exec__packed',
+                                               'IntervalTimer', 'String')
+                                  and not v.get('template_types')
+                                  and not v['location']['file']
+                                  .startswith(header_lib_dir)]))
+
+    # Create output directory for generated output class delegate headers.
+    classes_dir = header_lib_dir.joinpath('classes')
+    classes_dir.makedirs_p()
+
+    header_files = []
+
+    delegate_classes = OrderedDict(sorted(classes.items())[:len(classes)])
+
+    for name_i, class_i in delegate_classes.iteritems():
+        class_file_i = classes_dir.joinpath(name_i + '__Methods.h')
+        methods_i = (get_methods(class_i['members']) if 'members' in class_i
+                     else [])
+
+        # Write method delegation header for `class_i`.
+        with class_file_i.open('w') as output_i:
+            output_i.write(render_method_delegate(name_i, methods_i))
+        header_files.append(class_file_i)
+
+    # Create a global class delegation header to delegate each method call
+    # using the respective method delegate header.
+    include_headers = [classes_dir.relpathto(f).replace('\\', '/')
+                       for f in header_files]
+    class_delegate_file = classes_dir.joinpath('ClassDelegate.h')
+    with class_delegate_file.open('w') as output:
+        output.write(render_class_delegate(include_headers,
+                                           delegate_classes.items()))
