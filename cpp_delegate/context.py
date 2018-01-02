@@ -1,3 +1,4 @@
+import datetime as dt
 import hashlib
 
 from pydash import py_ as py__
@@ -76,10 +77,10 @@ class RemoteContext(Context, DirMixIn):
         An attribute corresponding to each public variable or field within the
         remote context :attr:`namespace`.
     '''
-    def __init__(self, stream, cpp_ast_json, namespace=''):
+    def __init__(self, stream, cpp_ast_json, namespace='', timeout=None):
         self.stream = stream
         super(RemoteContext, self).__init__(cpp_ast_json, namespace=namespace)
-        self._addresses = dict([(k, self._address_of(str(k)))
+        self._addresses = dict([(k, self._address_of(str(k), timeout=timeout))
                                 for k in sorted(self._attributes.keys())])
 
     def __dir__(self):
@@ -139,7 +140,7 @@ class RemoteContext(Context, DirMixIn):
         else:
             super(RemoteContext, self).__setattr__(attr, value)
 
-    def _address_of(self, label):
+    def _address_of(self, label, timeout=None):
         '''
         Parameters
         ----------
@@ -159,8 +160,12 @@ class RemoteContext(Context, DirMixIn):
                                    type_=nq.NadaMq.PACKET_TYPES.DATA)
         self.stream.write(packet.tostring())
 
+        start = dt.datetime.now()
         while not self.stream.in_waiting:
-            pass
+            if timeout is not None and (dt.datetime.now() -
+                                        start).total_seconds() > timeout:
+                raise RuntimeError('Timed out waiting for address of %s' %
+                                   label)
         return np.fromstring(self.stream.read(self.stream.in_waiting),
                              dtype='uint32')[0]
 
