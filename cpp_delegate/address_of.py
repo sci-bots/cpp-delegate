@@ -95,6 +95,20 @@ inline uint32_t address_of(char const *member_name) {
 
 
 def get_attributes(members):
+    '''
+    Filter members to only include supported attributes, removing, e.g.,
+    methods and functions.
+
+    Parameters
+    ----------
+    members : dict
+        ``"members"`` value from C++ abstract syntax tree namespace.
+
+    Returns
+    -------
+    dict
+        Filtered ``"members"`` value containing only supported attributes.
+    '''
     return py_.pick_by(members, lambda v, k:
                        (v['kind'] not in ('FUNCTION_DECL', 'CXX_METHOD'))
                        and (v['name'] not in ('SREG', 'DDRB', 'DDRC', 'DDRD',
@@ -109,6 +123,23 @@ def get_attributes(members):
 
 
 def render(cpp_ast_json, attributes):
+    '''
+    Render ``AddressOf.h`` contents for the specified attributes.
+
+    Parameters
+    ----------
+    cpp_ast_json : dict
+        JSON-friendly C++ source abstract syntax tree (AST).
+    attributes : dict
+        Attributes within a namespace of the C++ AST.
+
+        See also :func:`get_attributes`.
+
+    Returns
+    -------
+    str
+        Rendered ``AddressOf.h`` contents.
+    '''
     namespace_types = [v['type'] for k, v in attributes.iteritems()
                        if '::' in v['type']]
     namespace_headers = []
