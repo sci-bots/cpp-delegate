@@ -90,10 +90,6 @@ def dump_address_of_header(env, cpp_ast_json):
 
 
 def parse_cpp_ast(source, env):
-    # Get include paths from build environment.
-    cpppath_dirs = [ph.path(env[i[1:]] if i.startswith('$') else i)
-                    for i in env['CPPPATH']]
-    cpppath_flags = ['-I{}'.format(p) for p in cpppath_dirs]
     # Get define flags from build environment.
     defines = [[env[d_i[1:]] if d_i.startswith('$') else d_i
                 for d_i in map(str, d)] for d in env['CPPDEFINES']]
@@ -102,11 +98,24 @@ def parse_cpp_ast(source, env):
         defines += [[k] for k in ('KINETISK', '__arm__')
                     if k not in define_keys]
     define_flags = ['-D{}'.format(' '.join(map(str, d))) for d in defines]
+
+    # Get include paths from build environment.
+    cpppath_dirs = [ph.path(env[i[1:]] if i.startswith('$') else i)
+                    for i in env['CPPPATH']]
+    if env["CC"] == "arm-none-eabi-gcc":
+        # Explicitly add parent dir of `stdint.h` to list of include paths.
+        gcc_include_dir = (ph.path(env['PIOHOME_DIR']).realpath()
+                           .joinpath('packages', 'toolchain-gccarmnoneeabi',
+                                     'arm-none-eabi', 'include'))
+        if gcc_include_dir.isdir():
+            cpppath_dirs += [gcc_include_dir]
+    cpppath_flags = ['-I{}'.format(p) for p in cpppath_dirs]
+
     print 'CPPPATH_FLAGS:'
     for p in cpppath_dirs:
         print 3 * ' ', '{} {}'.format(p, p.isdir())
     print 'DEFINE_FLAGS:'
-    for d in defines:
+    for d in define_flags:
         print 3 * ' ', d
 
     return ca.parse_cpp_ast(source, *(define_flags + cpppath_flags),
@@ -116,7 +125,7 @@ def parse_cpp_ast(source, env):
 def test(v):
     try:
         json.dumps(v)
-    except:
+    except Exception:
         return False
     else:
         return True
